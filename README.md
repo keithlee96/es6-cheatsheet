@@ -13,6 +13,7 @@ snippet examples for your day to day workflow. Contributions are welcome!
 - [Modules](#modules)
 - [Parameters](#parameters)
 - [Classes](#classes)
+- [Closures](#closure)
 - [Symbols](#symbols)
 - [Maps](#maps)
 - [WeakMaps](#weakmaps)
@@ -20,9 +21,122 @@ snippet examples for your day to day workflow. Contributions are welcome!
 - [Generators](#generators)
 - [Async Await](#async-await)
 - [Getter/Setter functions](#getter-and-setter-functions)
+- [Regex](#regex)
 - [License](#license)
 
+## Under the hood
+### Initalization and Execution
+
+There are 2 stages to code execution. Initalization and execution. This is a recursive process, as during execution of code, another initalization might occur.
+
+#### Initalization
+
+When code inside a `{}` is run, JavaScript will determine how much memory to allocate to variables. Variables will be initalized to `undefined` until they hit a line of code that sets that variable's value.
+
+#### Execution
+
+The code is executed. Variables within a closure (`{}`) will have their references determine based on what each variable is set to in it's closest lexical scope
+
+```javascript
+{
+    const a = 5;
+    {
+        // As a is defined by let in this scope, memory is set aside for the re-defined variable a, which is initally undefined
+        console.log(a); 
+        // logs a is undefined
+        let a = 3;
+    }
+}
+```
+### Prototypal inheritance
+
+JavaScript makes use of Prototypal inheritance, rather than Classical inheritance.
+
+When searching for Object attributes, it checks if they are on the current object. If not, they check it's prototype.
+If it's not there, JavaScript keeps going up the prototype chain
+
+### `this` value
+
+When a function is called, `this` is set to the value of the object that this function was an attribute of. This is set to be the value of the object this executable code is a part of.
+
+    `func.call(thisValue, ...args)` - set this to thisValue and call the function with args
+    `func.bind(thisValue)` - set this to thisValue (The first call of bind takes precedence)
+
+Arrow functions set the value of `this` to match the outer lexical value of `this` and cannot be changed using `.call()` or `.bind()`
+
+## Basic logic constructs
+### If-else
+```javascript
+if(a === 1){
+    // code
+}else{
+    // code
+}
+```
+### while
+```javascript
+while(condition){
+  // code
+  break // Break out of the loop and continue code execution
+  continue // Go back to the condition
+}
+```
+### loops
+```javascript
+for(let i = 0; i<10; i++){
+  // code executes 10 times
+}
+```
+> **Note**:
+  When you have a loop with a `let i` and the code inside updates the value of `i`, the time `i` is updated will only sometimes affect the value of `i` in future iterations.
+  when `i` is updated before the loop ends, the value of future iterations of `i` will be affected.
+  When `i` is updated after the loop ends, that does not affect future iteration values of `i`.
+
+#### for-of
+for-of will use an object specific iterator. This works on any object with the `Symbol.iterator` generator function defined or is itself a generator function. (Eg; this works on Arrays, since they have a defined `Symbol.iterator` generator function). (Reccomended for most JavaScript objects)
+
+```javascript
+obj[Symbol.iterator] = generatorFunction
+
+for(let i of obj){
+    // Iterate over this object's iterables
+    // Throws an error if this object has no iterator
+}
+```
+
+#### for-in
+
+For-in returns the enumerable attribute names of an object. This includes any properties defined up the prototype chain too.
+
+```javascript
+for(let i in obj){
+    attribute = obj[i]
+    // more code
+}
+```
+
+```javascript
+obj= {
+  "a": 'aa',
+  "b":'bb'
+}
+
+obj.__proto__ = {
+  "c":'cc'
+}
+
+for (let o in obj) {
+  console.log(foo[o]);
+  // logs 'aa','bb','cc'
+}
+```
 ## var versus let / const
+
+var - function scoped
+
+let - lexically scoped (nearest enclosing {})
+
+const - lexically scoped and immutable reference
 
 > Besides `var`, we now have access to two new identifiers for storing values
 —`let` and `const`. Unlike `var`, `let` and `const` statements are not hoisted
@@ -321,6 +435,13 @@ let text = `The time and date is ${today.toLocaleString()}`;
 Destructuring allows us to extract values from arrays and objects (even deeply
 nested) and store them in variables with a more convenient syntax.
 
+Destructured assignments are simultaneous, allowing you to write clean code.
+
+Swapping variables:
+```javascript
+[a,b]=[b,a]
+```
+
 ### Destructuring Arrays
 
 ```javascript
@@ -348,11 +469,23 @@ var father = luke.father; // 'anakin'
 
 ```javascript
 let luke = { occupation: 'jedi', father: 'anakin' };
-let {occupation, father} = luke;
+let {occupation, father='anakin'} = luke;
 
 console.log(occupation); // 'jedi'
 console.log(father); // 'anakin'
 ```
+
+### Default assignments
+```javascript
+let luke = { occupation: 'jedi' };
+// If father is not defined in luke, father is set to anakin
+let {occupation, father = 'anakin'} = luke;
+
+console.log(occupation); // 'jedi'
+console.log(father); // 'anakin'
+```
+
+Note: Destructured assignments are particularly useful for use as function parameters
 
 <sup>[(back to table of contents)](#table-of-contents)</sup>
 
@@ -439,6 +572,9 @@ paradigm, we make our code easily readable and allow ourselves to interpolate
 between CommonJS and ES6 modules.
 
 ### Importing in ES6
+
+By default, import will import the object named "default", which is set by the exporting program
+`export default <<blah>>`;
 
 ES6 provides us with various flavors of importing. We can import an entire file:
 
@@ -549,7 +685,7 @@ addTwoNumbers(); // 0
 
 ### Rest Parameters
 
-In ES5, we handled an indefinite number of arguments like so:
+In ES5, we handled an indefinite number of arguments with the `arguments` object:
 
 ```javascript
 function logArguments() {
@@ -602,6 +738,21 @@ function initializeCanvas(
     }
 ```
 
+### Destructured function
+
+You can use destructuring, in conjunction with default values to define different functions succinctly
+
+```javascript
+function funcName({destructured = 'optional default value'}, inputVar = 'default value'){
+  if(destructured === 'optional default value'){
+    console.log("you passed in an object of the form {destructured: 'something'} as the first parameter");
+  }else{
+    console.log("you did not pass in an object with the destructured value set");
+    // or you might have passed in exactly {destructured = 'optional default value', blah, blah, blah}
+  }
+}
+```
+
 ### Spread Operator
 
 In ES5, we could find the max of values in an array by using the `apply` method on `Math.max` like this:
@@ -626,6 +777,17 @@ let places = ['Miami', ...cities, 'Chicago']; // ['Miami', 'San Francisco', 'Los
 <sup>[(back to table of contents)](#table-of-contents)</sup>
 
 ## Classes
+
+Conceptual note: ES6 classes still use prototypal inheritance under the hood. Classes in ES6 do NOT work like classical classes (eg; java classes).
+
+The `new` keyword is applied to a function and binds a new empty object `{}` to the function, replacing it's return type with this new object.
+
+Hence, functions that modify attributes of the `this` object act like constructors when paired with the `new` keyword. A JavaScript class is just a function that sets it's own variables. The traditional ES5 object was a function with
+attributes of the prototype set to be the object functions.
+
+All functions in the es6 class are attributes of the `functionName.prototype`, which becomes the `__proto__` of all objects created by this constructor. All static functions in the es6 class are simply placed on the `__proto__` of the constructor functions.
+
+To reiterate: Do not think that ES6 classes are any different from ES5 classes. They just look like they use classical inheritance.
 
 Prior to ES6, we implemented Classes by creating a constructor function and
 adding properties by extending the prototype:
@@ -696,10 +858,36 @@ class Personal extends Person {
 ```
 
 > **Best Practice**: While the syntax for creating classes in ES6 obscures how
-implementation and prototypes work under the hood, it is a good feature for
-beginners and allows us to write cleaner code.
+implementation and prototypes work under the hood, it allows us to write cleaner code.
+
+> **Note**: Private variables are not easily defined in ES6 class constructors. The only way to create a private variable is to define any functions that use the private variables in the constructor. However, this pattern comes with a significant memory tradeoff, since you redefine the function every time you create an object of that class.
+
+```javascript
+class Personal extends Person {
+    constructor(name, age, gender, occupation, hobby) {
+        super(name, age, gender);
+        this.hobby = hobby;
+        // Occupation is kept private, but this function is re-defined in every child object
+        this.getOccupation = ()=>occupation;
+    }
+}
+```
 
 <sup>[(back to table of contents)](#table-of-contents)</sup>
+
+
+## Closures
+
+Even after the outer scope has finished execution, the inner scope can still access the outer scope's variables
+Note: this is especially relavent to functions, allowing you to create psuedo "private" variables
+```javascript
+{
+    // outer scope
+    { 
+        // inner scope
+    }
+}
+```
 
 ## Symbols
 
@@ -1194,6 +1382,22 @@ person.fullName; // James Bond
 person.fullName = 'Bond 007';
 person.fullName; // Bond 007
 ```
+<sup>[(back to table of contents)](#table-of-contents)</sup>
+
+## Regex
+
+```
+/regex/ - matches any string containing 'regex' as a substring
+/regex$/ - matches any string ending with 'regex'
+/^regex/ - matches any string starting with regex
+/r*egex/ - matches egex, preceded by any number of r characters
+/r+egex/ - matches egex, preceded by any 1 or more x characters
+/r?egex/ - matches egex or regex
+/r{n,m}egex/ - n and m are numbers - matches egex, preceded by between n to m copies of r
+/[^regex]/ - any string that does NOT contain regex
+/reg|ex/ - matches any string containing either reg or ex
+```
+
 <sup>[(back to table of contents)](#table-of-contents)</sup>
 
 ## License
