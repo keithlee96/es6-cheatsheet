@@ -5,6 +5,7 @@ snippet examples for your day to day workflow. Contributions are welcome!
 
 ## Table of Contents
 
+- [Initalization and execution](#initalization-and-execution)
 - [var versus let / const](#var-versus-let--const)
 - [Replacing IIFEs with Blocks](#replacing-iifes-with-blocks)
 - [Arrow Functions](#arrow-functions)
@@ -24,30 +25,78 @@ snippet examples for your day to day workflow. Contributions are welcome!
 - [Regex](#regex)
 - [License](#license)
 
-## Under the hood
-### Initalization and Execution
+## Initalization and Execution
 
-There are 2 stages to code execution. Initalization and execution. This is a recursive process, as during execution of code, another initalization might occur.
+There are 2 stages that Javascript code goes through when it is run. Initalization and execution. When code inside of a specific scope (Any `{}` block), it goes through both stages sequentially. This could be a recursive process, as during execution of a block of code, another initalization might occur for nested code.
 
 #### Initalization
 
-When code inside a `{}` is run, JavaScript will determine how much memory to allocate to variables. Variables will be initalized to `undefined` until they hit a line of code that sets that variable's value.
+When code inside a `{}` is run, JavaScript will perform memory allocation. Variables will be initalized to `undefined` until they hit a line of code that sets that variable's value.
 
 #### Execution
 
-The code is executed. Variables within a closure (`{}`) will have their references determine based on what each variable is set to in it's closest lexical scope
+The code is executed. Variables within a closure (`{}`) will have their references determine based on what each variable is set to in it's closest lexical scope. Eg; if a variable is not explicitly defined in this scope, we check it's outerscope for any definitions of that same variable.
+
+Any variable defined with var within a nested block of code will be initalized based on it's function scope instead of it's lexical scope. This can lead to unexpected behaviour with regards to scoping, as highlighted here:
 
 ```javascript
 {
     const a = 5;
     {
-        // As a is defined by let in this scope, memory is set aside for the re-defined variable a, which is initally undefined
+        // a is not explicitly defined in this scope. Hence, this references a in the outer scope
+        console.log(a);
+        // logs 5
+    }
+}
+
+{
+    const a = 5;
+    {
+        // Scope B
+        // Due to the let statement within Scope B, when Scope B is initalized, memory for variable a is assigned and set to undefined
         console.log(a); 
-        // logs a is undefined
+        // logs undefined
         let a = 3;
     }
 }
+
+{
+    // Scope A
+    const a = 5;
+    {
+        // Scope B
+        // The let statement in Scope C does not initalize the memory for nested variable a until scope C is initalized
+        // Hence, this references a in the outer scope
+        console.log(a); 
+        // logs 5
+        {
+            // Scope C            
+            // Same concept as before, when Scope C is initalized, memory for variable a is assigned and set to undefined
+            console.log(a);
+            // logs undefined
+            let a = 3;
+        }
+    }
+}
+
+{
+    // Scope A
+    const a = 5;
+    {
+        // Scope B
+        // Due to the var (not let) statement in scope C, when scope B is initalized, memory for variable a is assigned and set to undefined
+        console.log(a); 
+        // logs undefined
+        {
+            // Scope C
+            var a = 3;
+        }
+    }
+}
+
 ```
+
+
 ### Prototypal inheritance
 
 JavaScript makes use of Prototypal inheritance, rather than Classical inheritance.
@@ -65,6 +114,7 @@ When a function is called, `this` is set to the value of the object that this fu
 Arrow functions set the value of `this` to match the outer lexical value of `this` and cannot be changed using `.call()` or `.bind()`
 
 ## Basic logic constructs
+
 ### If-else
 ```javascript
 if(a === 1){
@@ -82,6 +132,7 @@ while(condition){
 }
 ```
 ### loops
+#### Standard loop - (initalize, condition, increment)
 ```javascript
 for(let i = 0; i<10; i++){
   // code executes 10 times
@@ -136,7 +187,9 @@ var - function scoped
 
 let - lexically scoped (nearest enclosing {})
 
-const - lexically scoped and immutable reference
+const - lexically scoped and immutable (The refernce is immutable, the object itself can be modified)
+
+Implicit definitions - Dangerous - A variable refernced, but not explictly defined anywhere will become part of the global execution scope.
 
 > Besides `var`, we now have access to two new identifiers for storing values
 —`let` and `const`. Unlike `var`, `let` and `const` statements are not hoisted
@@ -875,7 +928,6 @@ class Personal extends Person {
 
 <sup>[(back to table of contents)](#table-of-contents)</sup>
 
-
 ## Closures
 
 Even after the outer scope has finished execution, the inner scope can still access the outer scope's variables
@@ -884,10 +936,72 @@ Note: this is especially relavent to functions, allowing you to create psuedo "p
 {
     // outer scope
     { 
-        // inner scope
+        // inner scope A
+    }
+
+    {
+        // inner scope B
     }
 }
 ```
+### Advanced concept: Memory management with closures
+
+In JavaScript, accessible memory outside of a block (`{}`) is represented by a dictionary-like refrence object, which will contain a subset of the variables within it's outer lexical scope. JavaScript's dictionary-like scope reference object does not contain a reference to any variables that are NOT used within the inner scope. Hence, even with closures, this allows JavaScript to perform garbage collection on variables in the outer scope once outer scope execution has completed, even if the inner scopes are still referenced in executing code, but the inner scope do not make use of a variable in the outer scope.
+
+An example of this would be in the case of a function that returns a function. Consider the following case:
+
+```javascript
+function outer(){
+    let a = 1;
+    let b = new Array(1000000).join('*');
+    return function inner(){
+        debugger; // a can be referenced, but b cannot!
+        return a;
+    }
+}
+let ref = outer();
+```
+In the `outer()` function, `outer()`'s execution environment will contain a reference to variables a and b. During outer's execution, a dictionary-like reference object will be created to allow nested code blocks inside of `outer()` (Eg; `inner()`) to access variables in outer. This keeps an in-memory reference to a subset of variables found in `outer()`, preventing garbage collection from deleting variables in the outer scope which we still want to access inside of nested scopes that may be executed later. This is what enables us to use JavaScript closures, accessing variables definined in outer() within inner(), even after outer() has finished executing.
+
+However, consider the memory taken up by variable `b`. It is defined in `outer()`, but is not referenced anywhere within `inner()`. We would much prefer if JavaScript was intelligent enough to garbage collect this variable, which JavaScript does!
+
+JavaScript does this by having the dictionary-like reference object only containing references to variables actually referenced by functions in the inner scopes. In this example, this reference object would contain a reference to `a`, but not to `b`, since `b` is not referenced in `inner`. You can actually verify this, using a debugger to step through the above code. When you add the line `ref();` to call the `inner()` function on the `debugger` line, you will be able to access `a`, but not `b`. Hence, after the execution of `outer()`, there are no remaining references to `b` and it can be automatically garbage collected. (The tradeoff is that within an inner lexical scope, variables in the outer lexical scope are not accessible if they were not reference within the inner scope's code).
+
+Here is when the memory leak occurs: in current JavaScript implementations, the dictionary-like reference object used to access variables in the outer scope is the same object for all inner scopes! Hence, consider the following example:
+
+```javascript
+let theThing = null;
+
+function replaceThing() {
+    // Outer scope
+    var originalThing = theThing;
+    function unused() {
+        // Inner scope 1
+        if (originalThing)
+            console.log("hi");
+    };
+    theThing = {
+        // Inner scope 2
+        longStr: new Array(1000000).join('*'),
+        someMethod: function () {
+            console.log(someMessage);
+        }
+    };
+};
+setInterval(replaceThing, 1000);
+```
+
+Because the dictionary-like reference object is shared by all inner scopes, when `replaceThing` is executed, the code above will result in old `theThing` objects never being garbage collected and more and more memory being taken up every time that `replaceThing` is executed. Hopefully, you can analyse the code above for yourself and understand why this memory leak occurs, but if you get stuck, just keep reading this explaination.
+
+To simplify the following explaination, I will refer to the dictionary-like reference object for inner scopes within replace thing as DictRef.
+
+When replaceThing is executed, the `unused()` function results in `originalThing` being added to DictRef. The new object assigned to `theThing` is an object created within the lexical scope of `replaceThing`. Hence, it references the same DictRef object. After `replaceThing` has finished executing, the DictRef object maintains a reference to `originalThing`. Hence, despite the fact that it is not needed anymore, `originalThing` (The previous `theThing` object) cannot be garbage collected. The DictRef object will remain in memory for as long as a reference to the new `theThing` object exists. This repeats everytime `replaceThing` is called. Each `theThing` object will reference a DictRef object that references the previous version of `theThing`, resulting in an ever growing linked list of closures.
+
+This might be fixed in a future version of JavaScript, but it's something to be aware of for now.
+
+This blurb was inspired by section 4:Closures in this [Medium article](https://blog.meteor.com/an-interesting-kind-of-javascript-memory-leak-8b47d2e7f156).
+
+<sup>[(back to table of contents)](#table-of-contents)</sup>
 
 ## Symbols
 
